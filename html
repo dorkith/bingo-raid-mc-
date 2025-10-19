@@ -37,7 +37,7 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: .5rem;
+      gap:.5rem;
       margin-bottom: 1rem;
     }
     input[type=text] {
@@ -57,6 +57,14 @@
     }
     button:hover { transform: scale(1.05); }
     #genBtn { background: var(--accent); color:#04141f; }
+
+    #counter {
+      text-align:center;
+      margin-bottom: 1rem;
+      font-weight:600;
+      font-size:1rem;
+      color: #4dd2ff;
+    }
 
     .grid {
       display:grid;
@@ -146,6 +154,7 @@
         <input id="pseudoInput" type="text" placeholder="Entre ton pseudo..." />
         <button id="genBtn">🎲 Générer ma grille</button>
       </div>
+      <div id="counter">Lignes validées: 0 | Colonnes validées: 0</div>
       <div id="grid" class="grid"></div>
       <footer>
         Grille unique par pseudo — cases sauvegardées localement.<br>
@@ -167,6 +176,7 @@
     const gridEl=document.getElementById('grid');
     const pseudoInput=document.getElementById('pseudoInput');
     const genBtn=document.getElementById('genBtn');
+    const counterEl = document.getElementById('counter');
 
     function showPopup(msg){
       const pop=document.createElement('div');
@@ -188,24 +198,43 @@
       }
     }
 
-    function checkLinesAndColumns(cells){
-      let completeRow=false, completeCol=false, all=true;
+    function checkGrid(cells){
+      // Reset highlights
+      cells.forEach(c=>c.classList.remove('highlight'));
+
+      let rowValid = new Array(ROWS).fill(false);
+      let colValid = new Array(COLS).fill(false);
+
+      // Check rows
       for(let r=0;r<ROWS;r++){
         if([...Array(COLS).keys()].every(c=>cells[r*COLS+c].querySelector('input').checked)){
-          completeRow=true;
+          rowValid[r]=true;
           [...Array(COLS).keys()].forEach(c=>cells[r*COLS+c].classList.add('highlight'));
         }
       }
+
+      // Check columns
       for(let c=0;c<COLS;c++){
         if([...Array(ROWS).keys()].every(r=>cells[r*COLS+c].querySelector('input').checked)){
-          completeCol=true;
+          colValid[c]=true;
           [...Array(ROWS).keys()].forEach(r=>cells[r*COLS+c].classList.add('highlight'));
         }
       }
-      all = cells.every(cell=>cell.querySelector('input').checked);
-      if(completeRow) showPopup("✅ Ligne validée !");
-      if(completeCol) showPopup("✅ Colonne validée !");
-      if(all){ showPopup("🎉 BINGO COMPLET !"); confettiBurst(); }
+
+      // Update counter
+      const totalRows = rowValid.filter(v=>v).length;
+      const totalCols = colValid.filter(v=>v).length;
+      counterEl.textContent = `Lignes validées: ${totalRows} | Colonnes validées: ${totalCols}`;
+
+      // Show popups
+      rowValid.forEach((v,r)=>{if(v) showPopup(`✅ Ligne ${r+1} validée !`);});
+      colValid.forEach((v,c)=>{if(v) showPopup(`✅ Colonne ${c+1} validée !`);});
+
+      // Entire grid
+      if(cells.every(cell=>cell.querySelector('input').checked)){
+        showPopup("🎉 BINGO COMPLET !");
+        confettiBurst();
+      }
     }
 
     function buildGridFor(pseudo){
@@ -215,35 +244,39 @@
       const cellsData=order.slice(0,ROWS*COLS);
       let state={checked:{}};
       try{const raw=localStorage.getItem(key);if(raw)state=JSON.parse(raw);}catch(e){}
+
       gridEl.innerHTML='';
       const cells=[];
       cellsData.forEach((text,idx)=>{
         const cell=document.createElement('div');
         cell.className='cell';
         cell.dataset.idx=idx;
+
         const cb=document.createElement('input');
         cb.type='checkbox';
         cb.checked=!!state.checked[idx];
         if(cb.checked) cell.classList.add('checked');
-        const lbl=document.createElement('div');
-        lbl.textContent=text;
-        const x=document.createElement('div');
-        x.className='xmark';
-        x.textContent='✕';
+
+        const lbl=document.createElement('div'); lbl.textContent=text;
+        const x=document.createElement('div'); x.className='xmark'; x.textContent='✕';
+
         cb.addEventListener('change',()=>{
-          cell.classList.toggle('checked',cb.checked);
+          cell.classList.toggle('checked', cb.checked);
           state.checked[idx]=cb.checked;
-          localStorage.setItem(key,JSON.stringify(state));
-          checkLinesAndColumns(cells);
+          localStorage.setItem(key, JSON.stringify(state));
+          checkGrid(cells);
         });
+
         cell.append(cb,lbl,x);
         gridEl.appendChild(cell);
         cells.push(cell);
       });
+
       const newUrl=new URL(window.location.href);
-      newUrl.searchParams.set('pseudo',pseudo);
-      window.history.replaceState({},'',newUrl);
-      checkLinesAndColumns(cells);
+      newUrl.searchParams.set('pseudo', pseudo);
+      window.history.replaceState({}, '', newUrl);
+
+      checkGrid(cells);
     }
 
     function getPseudoFromUrl(){
